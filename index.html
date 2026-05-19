@@ -402,6 +402,50 @@
     const ENTRIES_KEY = 'gastoGasolina_entries';
     const CFG_KEY     = 'gastoGasolina_cfg';
 
+    // Dados históricos da temporada 2025-2026 (apenas semanas com abastecimento)
+    const TEMPORADA_2025_2026 = [
+      { data: '2025-07-28', colocado: 75.00 },
+      { data: '2025-08-04', colocado: 100.00 },
+      { data: '2025-08-11', colocado: 80.00 },
+      { data: '2025-08-18', colocado: 93.00 },
+      { data: '2025-09-01', colocado: 75.00 },
+      { data: '2025-09-15', colocado: 92.00 },
+      { data: '2025-09-22', colocado: 55.00 },
+      { data: '2025-09-29', colocado: 91.00 },
+      { data: '2025-10-06', colocado: 68.00 },
+      { data: '2025-10-13', colocado: 64.00 },
+      { data: '2025-10-20', colocado: 60.00 },
+      { data: '2025-10-27', colocado: 46.00 },
+      { data: '2025-11-03', colocado: 101.00 },
+      { data: '2025-11-10', colocado: 68.00 },
+      { data: '2025-11-17', colocado: 68.00 },
+      { data: '2025-12-01', colocado: 74.00 },
+      { data: '2025-12-08', colocado: 50.00 },
+      { data: '2025-12-15', colocado: 60.00 },
+      { data: '2025-12-22', colocado: 65.00 },
+      { data: '2025-12-29', colocado: 75.00 },
+      { data: '2026-01-05', colocado: 70.00 },
+      { data: '2026-01-12', colocado: 50.00 },
+      { data: '2026-01-19', colocado: 80.00 },
+      { data: '2026-01-26', colocado: 84.00 },
+      { data: '2026-02-02', colocado: 69.00 },
+      { data: '2026-02-09', colocado: 100.00 },
+      { data: '2026-02-16', colocado: 77.00 },
+      { data: '2026-02-23', colocado: 45.00 },
+      { data: '2026-03-02', colocado: 46.00 },
+      { data: '2026-03-09', colocado: 75.00 },
+      { data: '2026-03-16', colocado: 62.00 },
+      { data: '2026-03-23', colocado: 78.00 },
+      { data: '2026-03-30', colocado: 75.00 },
+      { data: '2026-04-06', colocado: 78.00 },
+      { data: '2026-04-13', colocado: 160.42 },
+      { data: '2026-04-20', colocado: 100.00 },
+      { data: '2026-04-27', colocado: 78.00 },
+      { data: '2026-05-04', colocado: 54.00 },
+      { data: '2026-05-11', colocado: 100.00 },
+      { data: '2026-05-18', colocado: 86.00 },
+    ];
+
     // ── Storage ────────────────────────────────────────────────
     function loadEntries() {
       try { return JSON.parse(localStorage.getItem(ENTRIES_KEY) || '[]'); }
@@ -652,6 +696,12 @@
     });
 
     // ── Init ───────────────────────────────────────────────────
+    // Pré-carrega dados históricos se o localStorage estiver vazio
+    if (loadEntries().length === 0 && !loadCfg().startDate) {
+      saveEntries(TEMPORADA_2025_2026);
+      saveCfg({ budget: 75, startDate: '2025-07-28' });
+    }
+
     loadSettingsUI();
     render();
   </script>
