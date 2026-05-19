@@ -309,6 +309,111 @@
     }
     .btn-save:hover { filter: brightness(1.1); }
 
+    /* Season end button */
+    .btn-season-end {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 12px;
+      background: rgba(240,165,0,0.08);
+      color: var(--orange);
+      border: 1px solid rgba(240,165,0,0.22);
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 14px;
+      transition: background 0.15s;
+    }
+    .btn-season-end:hover { background: rgba(240,165,0,0.16); }
+
+    /* Past seasons */
+    .seasons-toggle {
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: center;
+      padding: 8px;
+      user-select: none;
+      transition: color 0.15s;
+      letter-spacing: 0.3px;
+      margin-top: 4px;
+    }
+    .seasons-toggle:hover { color: var(--orange); }
+    .seasons-section {
+      display: none;
+      margin-top: 8px;
+      margin-bottom: 20px;
+    }
+    .seasons-section.open { display: block; }
+    .season-card {
+      background: var(--card);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--orange);
+      padding: 16px 18px;
+      margin-bottom: 10px;
+    }
+    .season-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .season-name { font-size: 15px; font-weight: 700; color: var(--orange); }
+    .season-period { font-size: 11px; color: var(--text-muted); }
+    .season-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .season-stat {
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    .season-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+    .season-stat-value { font-size: 15px; font-weight: 700; color: var(--text); }
+    .season-stat-value.pos { color: var(--pos); }
+    .season-stat-value.neg { color: var(--neg); }
+
+    /* Season end modal summary */
+    .season-summary {
+      background: rgba(0,0,0,0.25);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+    .season-summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .season-summary-row:last-child { border-bottom: none; }
+    .season-summary-row span:first-child { color: var(--text-muted); }
+    .season-summary-row span:last-child  { font-weight: 600; color: var(--text); }
+    .season-summary-row span:last-child.pos { color: var(--pos); }
+    .season-summary-row span:last-child.neg { color: var(--neg); }
+    .btn-end-confirm {
+      flex: 2;
+      padding: 14px;
+      background: var(--orange);
+      color: #0d1117;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+    .btn-end-confirm:hover { filter: brightness(1.1); }
+
     /* Scrollbar */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -350,6 +455,13 @@
       </div>
     </div>
 
+    <button class="btn-season-end" id="btnSeasonEnd">
+      🏁 Encerrar temporada atual
+    </button>
+
+    <div class="seasons-toggle" id="seasonsToggle">🏆 Temporadas anteriores</div>
+    <div class="seasons-section" id="seasonsSection"></div>
+
     <div class="settings-toggle" id="settingsToggle">⚙ Configurações</div>
     <div class="settings-card" id="settingsCard">
       <h3>Configurações</h3>
@@ -378,6 +490,23 @@
     </div>
   </div>
 
+  <!-- Season end modal -->
+  <div class="modal-overlay" id="seasonOverlay">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2>Encerrar Temporada</h2>
+      <div class="field">
+        <label>Nome da temporada</label>
+        <input type="text" id="seasonName" placeholder="Ex: 2025 – 2026">
+      </div>
+      <div class="season-summary" id="seasonSummaryPreview"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="btnSeasonCancel">Cancelar</button>
+        <button class="btn-end-confirm" id="btnSeasonConfirm">Encerrar e iniciar nova</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal -->
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal">
@@ -401,6 +530,13 @@
   <script>
     const ENTRIES_KEY = 'gastoGasolina_entries';
     const CFG_KEY     = 'gastoGasolina_cfg';
+    const SEASONS_KEY = 'gastoGasolina_seasons';
+
+    function loadSeasons() {
+      try { return JSON.parse(localStorage.getItem(SEASONS_KEY) || '[]'); }
+      catch { return []; }
+    }
+    function saveSeasons(s) { localStorage.setItem(SEASONS_KEY, JSON.stringify(s)); }
 
     // Dados históricos da temporada 2025-2026 (apenas semanas com abastecimento)
     const TEMPORADA_2025_2026 = [
@@ -554,6 +690,7 @@
       if (entries.length === 0) {
         tableContent.innerHTML =
           '<div class="empty-state"><div class="empty-icon">⛽</div>Nenhum abastecimento registado ainda</div>';
+        renderSeasons();
         return;
       }
 
@@ -598,7 +735,143 @@
           render();
         });
       });
+
+      renderSeasons();
     }
+
+    // ── Past seasons ──────────────────────────────────────────
+    function renderSeasons() {
+      const seasons = loadSeasons();
+      const section = document.getElementById('seasonsSection');
+      const toggle  = document.getElementById('seasonsToggle');
+
+      if (seasons.length === 0) {
+        toggle.style.display = 'none';
+        section.innerHTML = '';
+        return;
+      }
+      toggle.style.display = 'block';
+
+      const html = seasons.slice().reverse().map(s => {
+        const saldoCls = s.saldo >= 0 ? 'pos' : 'neg';
+        return `<div class="season-card">
+          <div class="season-card-header">
+            <span class="season-name">${s.nome}</span>
+            <span class="season-period">${s.inicio} → ${s.fim}</span>
+          </div>
+          <div class="season-stats">
+            <div class="season-stat">
+              <div class="season-stat-label">Semanas</div>
+              <div class="season-stat-value">${s.semanas}</div>
+            </div>
+            <div class="season-stat">
+              <div class="season-stat-label">Orçamento</div>
+              <div class="season-stat-value">€${s.orcamento.toFixed(2)}</div>
+            </div>
+            <div class="season-stat">
+              <div class="season-stat-label">Total colocado</div>
+              <div class="season-stat-value">€${s.colocado.toFixed(2)}</div>
+            </div>
+            <div class="season-stat">
+              <div class="season-stat-label">Saldo final</div>
+              <div class="season-stat-value ${saldoCls}">${fmtEur(s.saldo)}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      section.innerHTML = html;
+    }
+
+    // ── Season end modal ───────────────────────────────────────
+    const seasonOverlay = document.getElementById('seasonOverlay');
+
+    document.getElementById('btnSeasonEnd').addEventListener('click', () => {
+      const entries = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
+      const cfg     = loadCfg();
+      const budget  = getBudget();
+      const start   = getStartDate();
+
+      if (entries.length === 0) {
+        alert('Não há abastecimentos registados nesta temporada.');
+        return;
+      }
+
+      const lastDate    = entries[entries.length - 1].data;
+      const weeks       = weekCount(start, todayStr());
+      const orcamento   = weeks * budget;
+      const colocado    = entries.reduce((s, e) => s + Number(e.colocado), 0);
+      const saldo       = orcamento - colocado;
+      const saldoCls    = saldo >= 0 ? 'pos' : 'neg';
+
+      // Pre-fill season name from start/end years
+      const startYear = start.slice(0, 4);
+      const endYear   = todayStr().slice(0, 4);
+      document.getElementById('seasonName').value =
+        startYear === endYear ? startYear : startYear + ' – ' + endYear;
+
+      document.getElementById('seasonSummaryPreview').innerHTML = `
+        <div class="season-summary-row">
+          <span>Período</span>
+          <span>${fmtDate(start)} → ${fmtDate(todayStr())}</span>
+        </div>
+        <div class="season-summary-row">
+          <span>Semanas</span>
+          <span>${weeks}</span>
+        </div>
+        <div class="season-summary-row">
+          <span>Orçamento acumulado</span>
+          <span>€${orcamento.toFixed(2)}</span>
+        </div>
+        <div class="season-summary-row">
+          <span>Total colocado</span>
+          <span>€${colocado.toFixed(2)}</span>
+        </div>
+        <div class="season-summary-row">
+          <span>Saldo final</span>
+          <span class="${saldoCls}">${fmtEur(saldo)}</span>
+        </div>
+        <div class="season-summary-row">
+          <span>Abastecimentos</span>
+          <span>${entries.length}</span>
+        </div>`;
+
+      seasonOverlay.classList.add('open');
+    });
+
+    function closeSeasonModal() { seasonOverlay.classList.remove('open'); }
+
+    document.getElementById('btnSeasonCancel').addEventListener('click', closeSeasonModal);
+    seasonOverlay.addEventListener('click', e => { if (e.target === seasonOverlay) closeSeasonModal(); });
+
+    document.getElementById('btnSeasonConfirm').addEventListener('click', () => {
+      const nome    = document.getElementById('seasonName').value.trim() || 'Temporada';
+      const entries = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
+      const budget  = getBudget();
+      const start   = getStartDate();
+      const weeks   = weekCount(start, todayStr());
+
+      const summary = {
+        nome,
+        inicio:    fmtDate(start),
+        fim:       fmtDate(todayStr()),
+        semanas:   weeks,
+        orcamento: weeks * budget,
+        colocado:  entries.reduce((s, e) => s + Number(e.colocado), 0),
+        saldo:     weeks * budget - entries.reduce((s, e) => s + Number(e.colocado), 0),
+        registos:  entries.length,
+      };
+
+      const seasons = loadSeasons();
+      seasons.push(summary);
+      saveSeasons(seasons);
+
+      // Reset current season
+      saveEntries([]);
+      saveCfg({ budget });
+      loadSettingsUI();
+      closeSeasonModal();
+      render();
+    });
 
     // ── Modal ──────────────────────────────────────────────────
     const overlay = document.getElementById('modalOverlay');
@@ -631,6 +904,11 @@
     // Allow Enter on amount field to submit
     document.getElementById('modalAmount').addEventListener('keydown', e => {
       if (e.key === 'Enter') document.getElementById('btnSave').click();
+    });
+
+    // ── Seasons toggle ─────────────────────────────────────────
+    document.getElementById('seasonsToggle').addEventListener('click', () => {
+      document.getElementById('seasonsSection').classList.toggle('open');
     });
 
     // ── Settings ───────────────────────────────────────────────
