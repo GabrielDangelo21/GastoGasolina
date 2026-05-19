@@ -483,7 +483,8 @@
       </div>
       <div class="settings-actions">
         <button class="btn-sm blue" id="btnSaveSettings">Guardar</button>
-        <button class="btn-sm grey" id="btnSync">↕ Sincronizar com Sheets</button>
+        <button class="btn-sm grey" id="btnSync">⬆ Enviar para Sheets</button>
+        <button class="btn-sm grey" id="btnPull">⬇ Carregar do Sheets</button>
         <button class="btn-sm grey" id="btnExport">Exportar JSON</button>
         <button class="btn-sm grey" id="btnImport">Importar JSON</button>
         <button class="btn-sm red" id="btnClearAll">Limpar tudo</button>
@@ -963,7 +964,37 @@
       } catch (err) {
         alert('❌ Erro ao sincronizar: ' + err.message);
       } finally {
-        btn.textContent = '↕ Sincronizar com Sheets';
+        btn.textContent = '⬆ Enviar para Sheets';
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('btnPull').addEventListener('click', async () => {
+      const cfg = loadCfg();
+      if (!cfg.asUrl || !cfg.apiToken) {
+        alert('Preenche a Apps Script URL e o API Token nas configurações primeiro.');
+        return;
+      }
+      if (loadEntries().length > 0) {
+        if (!confirm('Isto vai substituir os dados locais pelos dados do Sheets. Continuar?')) return;
+      }
+      const btn = document.getElementById('btnPull');
+      btn.textContent = '⏳ A carregar...';
+      btn.disabled = true;
+      try {
+        const resp = await fetch(cfg.asUrl + '?token=' + encodeURIComponent(cfg.apiToken));
+        const j = await resp.json();
+        if (!j.success) throw new Error(j.error || 'erro desconhecido');
+        const entries = j.data
+          .filter(r => r.DATA)
+          .map(r => ({ data: r.DATA, colocado: Number(r.COLOCADO) }));
+        saveEntries(entries);
+        render();
+        alert('✅ ' + entries.length + ' registos carregados do Google Sheets!');
+      } catch (err) {
+        alert('❌ Erro ao carregar: ' + err.message);
+      } finally {
+        btn.textContent = '⬇ Carregar do Sheets';
         btn.disabled = false;
       }
     });
