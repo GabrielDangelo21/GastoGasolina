@@ -1,0 +1,585 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gasto Gasolina</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, Segoe UI, Roboto, Arial;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .container { max-width: 560px; margin: 0 auto; }
+
+    h1 { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px; }
+
+    /* Balance card */
+    .balance-card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom: 14px;
+    }
+    .balance-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #999;
+      margin-bottom: 10px;
+    }
+    .balance-amount {
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+    .balance-amount.pos { color: #1b7a34; }
+    .balance-amount.neg { color: #c62828; }
+    .balance-amount.empty { color: #bbb; }
+    .balance-stats {
+      font-size: 13px;
+      color: #888;
+      line-height: 1.6;
+    }
+    .balance-week-info {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 12px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      padding: 4px 10px;
+      color: #666;
+    }
+
+    /* Add button */
+    .btn-add {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 15px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 8px rgba(25,118,210,0.3);
+      transition: background 0.15s;
+    }
+    .btn-add:hover { background: #1565c0; }
+    .btn-add svg { flex-shrink: 0; }
+
+    /* Table card */
+    .table-card {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom: 14px;
+    }
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .table-header h2 { font-size: 14px; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.5px; }
+    .entry-count { font-size: 12px; color: #aaa; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #bbb;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: left;
+      background: #fafafa;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    tbody tr { border-bottom: 1px solid #f7f7f7; transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #fafafa; }
+    tbody td { padding: 11px 16px; font-size: 14px; color: #333; vertical-align: top; }
+    td.week-cell { font-size: 11px; color: #aaa; }
+    td.amount-cell { font-weight: 600; }
+    td.saldo-cell { font-weight: 700; }
+    td.saldo-cell.pos { color: #1b7a34; }
+    td.saldo-cell.neg { color: #c62828; }
+    td.action-cell { text-align: right; }
+    .btn-delete {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #ddd;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 16px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .btn-delete:hover { color: #e53935; }
+    .empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: #bbb;
+      font-size: 15px;
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+    /* Settings */
+    .settings-toggle {
+      font-size: 13px;
+      color: #bbb;
+      cursor: pointer;
+      text-align: center;
+      padding: 8px;
+      user-select: none;
+      transition: color 0.15s;
+    }
+    .settings-toggle:hover { color: #888; }
+    .settings-card {
+      display: none;
+      background: white;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-top: 8px;
+    }
+    .settings-card.open { display: block; }
+    .settings-card h3 { font-size: 13px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; color: #777; margin-bottom: 6px; }
+    .field input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #333;
+      background: #fafafa;
+    }
+    .field input:focus { outline: none; border-color: #1976d2; background: white; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+    .settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-sm {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-sm:hover { opacity: 0.85; }
+    .btn-sm.blue { background: #1976d2; color: white; }
+    .btn-sm.grey { background: #e0e0e0; color: #555; }
+    .btn-sm.red { background: #ffebee; color: #c62828; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 200;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 20px 20px 0 0;
+      padding: 28px 24px 32px;
+      width: 100%;
+      max-width: 560px;
+      animation: slideUp 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .modal-handle {
+      width: 40px; height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+    .modal h2 { font-size: 20px; font-weight: 700; margin-bottom: 22px; color: #1a1a2e; }
+    .modal .field input { font-size: 16px; padding: 13px 14px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 8px; }
+    .btn-cancel {
+      flex: 1;
+      padding: 14px;
+      background: #f5f5f5;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+    }
+    .btn-cancel:hover { background: #e8e8e8; }
+    .btn-save {
+      flex: 2;
+      padding: 14px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(25,118,210,0.3);
+    }
+    .btn-save:hover { background: #1565c0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Gasto Gasolina</h1>
+
+    <div class="balance-card">
+      <div class="balance-label">Disponível agora</div>
+      <div class="balance-amount empty" id="balanceAmount">—</div>
+      <div class="balance-stats" id="balanceStats">Adicione o primeiro abastecimento</div>
+      <div id="balanceWeekInfo"></div>
+    </div>
+
+    <button class="btn-add" id="btnAdd">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Adicionar abastecimento
+    </button>
+
+    <div class="table-card">
+      <div class="table-header">
+        <h2>Histórico</h2>
+        <span class="entry-count" id="entryCount"></span>
+      </div>
+      <div id="tableContent">
+        <div class="empty-state">
+          <div class="empty-icon">⛽</div>
+          Nenhum abastecimento registado ainda
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-toggle" id="settingsToggle">⚙ Configurações</div>
+    <div class="settings-card" id="settingsCard">
+      <h3>Configurações</h3>
+      <div class="field">
+        <label>Orçamento semanal (€)</label>
+        <input type="number" id="cfgBudget" step="0.01" min="0" placeholder="75.00">
+      </div>
+      <div class="field">
+        <label>Data de início (para acumulação do orçamento)</label>
+        <input type="date" id="cfgStartDate">
+      </div>
+      <div class="field">
+        <label>Apps Script URL (opcional)</label>
+        <input type="text" id="cfgAsUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <div class="field">
+        <label>API Token (opcional)</label>
+        <input type="text" id="cfgApiToken" placeholder="chave_secreta">
+      </div>
+      <div class="settings-actions">
+        <button class="btn-sm blue" id="btnSaveSettings">Guardar</button>
+        <button class="btn-sm grey" id="btnExport">Exportar JSON</button>
+        <button class="btn-sm grey" id="btnImport">Importar JSON</button>
+        <button class="btn-sm red" id="btnClearAll">Limpar tudo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2>Novo abastecimento</h2>
+      <div class="field">
+        <label>Data</label>
+        <input type="date" id="modalDate">
+      </div>
+      <div class="field">
+        <label>Valor colocado (€)</label>
+        <input type="number" id="modalAmount" step="0.01" min="0.01" placeholder="0.00">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="btnCancel">Cancelar</button>
+        <button class="btn-save" id="btnSave">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ENTRIES_KEY = 'gastoGasolina_entries';
+    const CFG_KEY     = 'gastoGasolina_cfg';
+
+    // ── Storage ────────────────────────────────────────────────
+    function loadEntries() {
+      try { return JSON.parse(localStorage.getItem(ENTRIES_KEY) || '[]'); }
+      catch { return []; }
+    }
+    function saveEntries(e) { localStorage.setItem(ENTRIES_KEY, JSON.stringify(e)); }
+
+    function loadCfg() {
+      try { return JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); }
+      catch { return {}; }
+    }
+    function saveCfg(c) { localStorage.setItem(CFG_KEY, JSON.stringify(c)); }
+
+    // ── Week helpers ───────────────────────────────────────────
+    function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+    // Monday of the ISO week containing dateStr (YYYY-MM-DD)
+    function weekMonday(dateStr) {
+      const d = new Date(dateStr + 'T12:00:00');
+      const day = d.getDay(); // 0=Sun
+      d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    // Number of weeks from startDate's Monday up to targetDate's Monday (min 1)
+    function weekCount(startDateStr, targetDateStr) {
+      const ms = weekMonday(targetDateStr) - weekMonday(startDateStr);
+      return Math.max(1, Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1);
+    }
+
+    // "Semana 03/06 – 08/06/26" label
+    function weekLabel(dateStr) {
+      const mon = weekMonday(dateStr);
+      const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+      const p = (n) => String(n).padStart(2, '0');
+      return p(mon.getDate()) + '/' + p(mon.getMonth()+1) + ' – ' +
+             p(sun.getDate()) + '/' + p(sun.getMonth()+1) + '/' +
+             String(sun.getFullYear()).slice(2);
+    }
+
+    function fmtDate(dateStr) {
+      const [y, m, d] = dateStr.split('-');
+      return d + '/' + m + '/' + y;
+    }
+
+    function fmtEur(val) {
+      const abs = Math.abs(val);
+      return (val < 0 ? '−' : '') + '€' + abs.toFixed(2);
+    }
+
+    // ── Reference start date ───────────────────────────────────
+    function getStartDate() {
+      const cfg = loadCfg();
+      if (cfg.startDate) return cfg.startDate;
+      const entries = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
+      return entries.length > 0 ? entries[0].data : todayStr();
+    }
+
+    function getBudget() {
+      const cfg = loadCfg();
+      return Number(cfg.budget) || 75;
+    }
+
+    // ── Render ─────────────────────────────────────────────────
+    function render() {
+      const entries = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
+      const budget = getBudget();
+      const start  = getStartDate();
+      const cfg    = loadCfg();
+
+      // Current available balance
+      const weeksNow   = weekCount(start, todayStr());
+      const totalBudget = weeksNow * budget;
+      const totalPlaced = entries.reduce((s, e) => s + Number(e.colocado), 0);
+      const available   = totalBudget - totalPlaced;
+
+      const balEl    = document.getElementById('balanceAmount');
+      const statsEl  = document.getElementById('balanceStats');
+      const weekInfo = document.getElementById('balanceWeekInfo');
+
+      if (entries.length === 0 && !cfg.startDate) {
+        balEl.textContent = '—';
+        balEl.className   = 'balance-amount empty';
+        statsEl.textContent = 'Adicione o primeiro abastecimento';
+        weekInfo.innerHTML  = '';
+      } else {
+        balEl.textContent = fmtEur(available);
+        balEl.className   = 'balance-amount ' + (available >= 0 ? 'pos' : 'neg');
+        statsEl.innerHTML =
+          '<strong>' + weeksNow + '</strong> sem. × €' + budget.toFixed(2) +
+          ' = <strong>€' + totalBudget.toFixed(2) + '</strong> acumulado' +
+          '&nbsp;&nbsp;|&nbsp;&nbsp;' +
+          '<strong>€' + totalPlaced.toFixed(2) + '</strong> colocado';
+        weekInfo.innerHTML =
+          '<span class="balance-week-info">Início: ' + fmtDate(start) +
+          ' &nbsp;·&nbsp; Semana atual: ' + weekLabel(todayStr()) + '</span>';
+      }
+
+      // Entry count
+      document.getElementById('entryCount').textContent =
+        entries.length > 0 ? entries.length + ' registo' + (entries.length !== 1 ? 's' : '') : '';
+
+      // Table
+      const tableContent = document.getElementById('tableContent');
+      if (entries.length === 0) {
+        tableContent.innerHTML =
+          '<div class="empty-state"><div class="empty-icon">⛽</div>Nenhum abastecimento registado ainda</div>';
+        return;
+      }
+
+      let html = '<table><thead><tr>' +
+        '<th>Data</th><th>Semana</th><th>Colocado</th><th>Saldo</th><th></th>' +
+        '</tr></thead><tbody>';
+
+      let runningPlaced = 0;
+      entries.forEach((e, i) => {
+        const wc         = weekCount(start, e.data);
+        const budgetHere = wc * budget;
+        runningPlaced   += Number(e.colocado);
+        const saldo      = budgetHere - runningPlaced;
+        const cls        = saldo >= 0 ? 'pos' : 'neg';
+
+        html += '<tr>' +
+          '<td><strong>' + fmtDate(e.data) + '</strong></td>' +
+          '<td class="week-cell">' + weekLabel(e.data) + '</td>' +
+          '<td class="amount-cell">€' + Number(e.colocado).toFixed(2) + '</td>' +
+          '<td class="saldo-cell ' + cls + '">' + fmtEur(saldo) + '</td>' +
+          '<td class="action-cell">' +
+            '<button class="btn-delete" data-idx="' + i + '" title="Apagar">✕</button>' +
+          '</td>' +
+          '</tr>';
+      });
+
+      html += '</tbody></table>';
+      tableContent.innerHTML = html;
+
+      // Delete buttons
+      tableContent.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.dataset.idx);
+          const all = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
+          all.splice(idx, 1);
+          saveEntries(all);
+          render();
+        });
+      });
+    }
+
+    // ── Modal ──────────────────────────────────────────────────
+    const overlay = document.getElementById('modalOverlay');
+
+    document.getElementById('btnAdd').addEventListener('click', () => {
+      document.getElementById('modalDate').value   = todayStr();
+      document.getElementById('modalAmount').value = '';
+      overlay.classList.add('open');
+      setTimeout(() => document.getElementById('modalAmount').focus(), 250);
+    });
+
+    function closeModal() { overlay.classList.remove('open'); }
+
+    document.getElementById('btnCancel').addEventListener('click', closeModal);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+    document.getElementById('btnSave').addEventListener('click', () => {
+      const date   = document.getElementById('modalDate').value;
+      const amount = parseFloat(document.getElementById('modalAmount').value);
+      if (!date)                  { alert('Por favor escolha a data.'); return; }
+      if (isNaN(amount) || amount <= 0) { alert('Por favor insira um valor válido.'); return; }
+
+      const entries = loadEntries();
+      entries.push({ data: date, colocado: Number(amount.toFixed(2)) });
+      saveEntries(entries);
+      closeModal();
+      render();
+    });
+
+    // Allow Enter on amount field to submit
+    document.getElementById('modalAmount').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('btnSave').click();
+    });
+
+    // ── Settings ───────────────────────────────────────────────
+    const settingsCard = document.getElementById('settingsCard');
+    document.getElementById('settingsToggle').addEventListener('click', () => {
+      settingsCard.classList.toggle('open');
+    });
+
+    function loadSettingsUI() {
+      const cfg = loadCfg();
+      document.getElementById('cfgBudget').value    = cfg.budget    || 75;
+      document.getElementById('cfgStartDate').value = cfg.startDate || '';
+      document.getElementById('cfgAsUrl').value     = cfg.asUrl     || '';
+      document.getElementById('cfgApiToken').value  = cfg.apiToken  || '';
+    }
+
+    document.getElementById('btnSaveSettings').addEventListener('click', () => {
+      const budget    = parseFloat(document.getElementById('cfgBudget').value) || 75;
+      const startDate = document.getElementById('cfgStartDate').value;
+      const asUrl     = document.getElementById('cfgAsUrl').value.trim();
+      const apiToken  = document.getElementById('cfgApiToken').value.trim();
+      saveCfg({ budget, startDate, asUrl, apiToken });
+      render();
+      settingsCard.classList.remove('open');
+    });
+
+    document.getElementById('btnExport').addEventListener('click', () => {
+      const payload = { entries: loadEntries(), cfg: loadCfg() };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'gasolina_' + todayStr() + '.json';
+      a.click();
+    });
+
+    document.getElementById('btnImport').addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = '.json';
+      input.onchange = ev => {
+        const file = ev.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e2 => {
+          try {
+            const payload = JSON.parse(e2.target.result);
+            // Support both {entries, cfg} and plain array
+            const entries = Array.isArray(payload) ? payload : (payload.entries || []);
+            const cfg     = Array.isArray(payload) ? {}       : (payload.cfg     || {});
+            if (!Array.isArray(entries)) throw new Error('formato inválido');
+            saveEntries(entries);
+            saveCfg(cfg);
+            loadSettingsUI();
+            render();
+            alert('Importado com sucesso! ' + entries.length + ' registos.');
+          } catch { alert('Erro ao importar — ficheiro inválido.'); }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    });
+
+    document.getElementById('btnClearAll').addEventListener('click', () => {
+      if (!confirm('Apagar todos os dados? Esta ação não pode ser desfeita.')) return;
+      saveEntries([]);
+      saveCfg({});
+      loadSettingsUI();
+      render();
+    });
+
+    // ── Init ───────────────────────────────────────────────────
+    loadSettingsUI();
+    render();
+  </script>
+</body>
+</html>
