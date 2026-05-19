@@ -955,7 +955,6 @@
         };
         const resp = await fetch(cfg.asUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         const j = await resp.json();
