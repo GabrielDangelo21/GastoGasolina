@@ -561,14 +561,19 @@
         '<th>Data</th><th>Semana</th><th>Colocado</th><th>Saldo</th><th></th>' +
         '</tr></thead><tbody>';
 
+      // Calcula saldos acumulados (ordem cronológica)
       let runningPlaced = 0;
-      entries.forEach((e, i) => {
+      const rows = entries.map((e, i) => {
         const wc         = weekCount(start, e.data);
         const budgetHere = wc * budget;
         runningPlaced   += Number(e.colocado);
         const saldo      = budgetHere - runningPlaced;
-        const cls        = saldo >= 0 ? 'pos' : 'neg';
+        return { e, i, saldo };
+      });
 
+      // Exibe da mais recente para a mais antiga
+      rows.slice().reverse().forEach(({ e, i, saldo }) => {
+        const cls = saldo >= 0 ? 'pos' : 'neg';
         html += '<tr>' +
           '<td><strong>' + fmtDate(e.data) + '</strong></td>' +
           '<td class="week-cell">' + weekLabel(e.data) + '</td>' +
