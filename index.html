@@ -483,6 +483,7 @@
       </div>
       <div class="settings-actions">
         <button class="btn-sm blue" id="btnSaveSettings">Guardar</button>
+        <button class="btn-sm grey" id="btnSync">↕ Sincronizar com Sheets</button>
         <button class="btn-sm grey" id="btnExport">Exportar JSON</button>
         <button class="btn-sm grey" id="btnImport">Importar JSON</button>
         <button class="btn-sm red" id="btnClearAll">Limpar tudo</button>
@@ -933,6 +934,39 @@
       saveCfg({ budget, startDate, asUrl, apiToken });
       render();
       settingsCard.classList.remove('open');
+    });
+
+    document.getElementById('btnSync').addEventListener('click', async () => {
+      const cfg = loadCfg();
+      if (!cfg.asUrl || !cfg.apiToken) {
+        alert('Preenche a Apps Script URL e o API Token nas configurações primeiro.');
+        return;
+      }
+      const btn = document.getElementById('btnSync');
+      btn.textContent = '⏳ A sincronizar...';
+      btn.disabled = true;
+      try {
+        // Envia todos os dados locais para o Sheets (replace_all)
+        const entries = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
+        const payload = {
+          token: cfg.apiToken,
+          action: 'replace_all',
+          entries: entries.map(e => ({ DATA: e.data, COLOCADO: Number(e.colocado) }))
+        };
+        const resp = await fetch(cfg.asUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const j = await resp.json();
+        if (!j.success) throw new Error(j.error || 'erro desconhecido');
+        alert('✅ Sincronizado! ' + entries.length + ' registos enviados para o Google Sheets.');
+      } catch (err) {
+        alert('❌ Erro ao sincronizar: ' + err.message);
+      } finally {
+        btn.textContent = '↕ Sincronizar com Sheets';
+        btn.disabled = false;
+      }
     });
 
     document.getElementById('btnExport').addEventListener('click', () => {
