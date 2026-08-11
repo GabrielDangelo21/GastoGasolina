@@ -240,6 +240,11 @@
       background: rgba(6,214,199,0.05);
       box-shadow: 0 0 0 3px var(--accent-glow);
     }
+    .field input:disabled {
+      color: var(--orange);
+      font-weight: 700;
+      opacity: 1;
+    }
     .settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn-sm {
       padding: 8px 14px;
@@ -523,8 +528,28 @@
         <input type="date" id="modalDate">
       </div>
       <div class="field">
-        <label>Valor colocado (€)</label>
-        <input type="number" id="modalAmount" step="0.01" min="0.01" placeholder="0.00">
+        <label>Preço do kW/h (€)</label>
+        <input type="number" id="modalPrecoKwh" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label>kW/h carregados</label>
+        <input type="number" id="modalKwh" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label>Taxa de início (€)</label>
+        <input type="number" id="modalTaxaInicio" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label>Preço de estacionamento (€/h)</label>
+        <input type="number" id="modalPrecoEstacionamento" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label>Tempo estacionado (h)</label>
+        <input type="number" id="modalTempoEstacionamento" step="0.25" min="0" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label>Total</label>
+        <input type="text" id="modalTotalPreview" disabled>
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" id="btnCancel">Cancelar</button>
@@ -881,12 +906,27 @@
 
     // ── Modal ──────────────────────────────────────────────────
     const overlay = document.getElementById('modalOverlay');
+    const modalFieldIds = ['modalPrecoKwh', 'modalKwh', 'modalTaxaInicio', 'modalPrecoEstacionamento', 'modalTempoEstacionamento'];
+
+    function calcTotal() {
+      const precoKwh              = parseFloat(document.getElementById('modalPrecoKwh').value) || 0;
+      const kwh                   = parseFloat(document.getElementById('modalKwh').value) || 0;
+      const taxaInicio            = parseFloat(document.getElementById('modalTaxaInicio').value) || 0;
+      const precoEstacionamento   = parseFloat(document.getElementById('modalPrecoEstacionamento').value) || 0;
+      const tempoEstacionamento   = parseFloat(document.getElementById('modalTempoEstacionamento').value) || 0;
+      return Number((precoKwh * kwh + taxaInicio + precoEstacionamento * tempoEstacionamento).toFixed(2));
+    }
+
+    function updateTotalPreview() {
+      document.getElementById('modalTotalPreview').value = '€' + calcTotal().toFixed(2);
+    }
 
     document.getElementById('btnAdd').addEventListener('click', () => {
-      document.getElementById('modalDate').value   = todayStr();
-      document.getElementById('modalAmount').value = '';
+      document.getElementById('modalDate').value = todayStr();
+      modalFieldIds.forEach(id => { document.getElementById(id).value = '0'; });
+      updateTotalPreview();
       overlay.classList.add('open');
-      setTimeout(() => document.getElementById('modalAmount').focus(), 250);
+      setTimeout(() => document.getElementById('modalPrecoKwh').focus(), 250);
     });
 
     function closeModal() { overlay.classList.remove('open'); }
@@ -895,21 +935,31 @@
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
     document.getElementById('btnSave').addEventListener('click', () => {
-      const date   = document.getElementById('modalDate').value;
-      const amount = parseFloat(document.getElementById('modalAmount').value);
-      if (!date)                  { alert('Por favor escolha a data.'); return; }
-      if (isNaN(amount) || amount <= 0) { alert('Por favor insira um valor válido.'); return; }
+      const date  = document.getElementById('modalDate').value;
+      const total = calcTotal();
+      if (!date)      { alert('Por favor escolha a data.'); return; }
+      if (total <= 0) { alert('Por favor insira pelo menos um valor.'); return; }
 
       const entries = loadEntries();
-      entries.push({ data: date, colocado: Number(amount.toFixed(2)) });
+      entries.push({
+        data: date,
+        colocado: total,
+        precoKwh: parseFloat(document.getElementById('modalPrecoKwh').value) || 0,
+        kwh: parseFloat(document.getElementById('modalKwh').value) || 0,
+        taxaInicio: parseFloat(document.getElementById('modalTaxaInicio').value) || 0,
+        precoEstacionamento: parseFloat(document.getElementById('modalPrecoEstacionamento').value) || 0,
+        tempoEstacionamento: parseFloat(document.getElementById('modalTempoEstacionamento').value) || 0,
+      });
       saveEntries(entries);
       closeModal();
       render();
     });
 
-    // Allow Enter on amount field to submit
-    document.getElementById('modalAmount').addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('btnSave').click();
+    // Recalcula o total e permite Enter para guardar
+    modalFieldIds.forEach(id => {
+      const el = document.getElementById(id);
+      el.addEventListener('input', updateTotalPreview);
+      el.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btnSave').click(); });
     });
 
     // ── Seasons toggle ─────────────────────────────────────────
