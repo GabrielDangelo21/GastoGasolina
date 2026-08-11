@@ -507,6 +507,10 @@
       <div class="modal-handle"></div>
       <h2>Encerrar Temporada</h2>
       <div class="field">
+        <label>Data de encerramento</label>
+        <input type="date" id="seasonEndDate">
+      </div>
+      <div class="field">
         <label>Nome da temporada</label>
         <input type="text" id="seasonName" placeholder="Ex: 2025 – 2026">
       </div>
@@ -629,34 +633,43 @@
     // ── Week helpers ───────────────────────────────────────────
     function todayStr() { return new Date().toISOString().slice(0, 10); }
 
-    // Monday of the ISO week containing dateStr (YYYY-MM-DD)
-    function weekMonday(dateStr) {
-      const d = new Date(dateStr + 'T12:00:00');
-      const day = d.getDay(); // 0=Sun
-      d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-      d.setHours(0, 0, 0, 0);
-      return d;
+    // Índice do bloco de 7 dias (0-based) em que targetDateStr cai,
+    // contando a partir de startDateStr (as semanas começam sempre na data de início, não na segunda-feira)
+    function weekIndex(startDateStr, targetDateStr) {
+      const start  = new Date(startDateStr  + 'T12:00:00');
+      const target = new Date(targetDateStr + 'T12:00:00');
+      const diffDays = Math.floor((target - start) / (24 * 60 * 60 * 1000));
+      return Math.max(0, Math.floor(diffDays / 7));
     }
 
-    // Number of weeks from startDate's Monday up to targetDate's Monday (min 1)
+    // Número de semanas (1-based) desde startDate até targetDate
     function weekCount(startDateStr, targetDateStr) {
-      const ms = weekMonday(targetDateStr) - weekMonday(startDateStr);
-      return Math.max(1, Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1);
+      return weekIndex(startDateStr, targetDateStr) + 1;
     }
 
-    // "Semana 03/06 – 08/06/26" label
+    // "01/08 – 07/08/26" — período da semana (ancorada em startDate) que contém dateStr
     function weekLabel(dateStr) {
-      const mon = weekMonday(dateStr);
-      const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+      const start = getStartDate();
+      const idx   = weekIndex(start, dateStr);
+      const wkStart = new Date(start + 'T12:00:00');
+      wkStart.setDate(wkStart.getDate() + idx * 7);
+      const wkEnd = new Date(wkStart); wkEnd.setDate(wkEnd.getDate() + 6);
       const p = (n) => String(n).padStart(2, '0');
-      return p(mon.getDate()) + '/' + p(mon.getMonth()+1) + ' – ' +
-             p(sun.getDate()) + '/' + p(sun.getMonth()+1) + '/' +
-             String(sun.getFullYear()).slice(2);
+      return p(wkStart.getDate()) + '/' + p(wkStart.getMonth()+1) + ' – ' +
+             p(wkEnd.getDate()) + '/' + p(wkEnd.getMonth()+1) + '/' +
+             String(wkEnd.getFullYear()).slice(2);
     }
 
     function fmtDate(dateStr) {
       const [y, m, d] = dateStr.split('-');
       return d + '/' + m + '/' + y;
+    }
+
+    // Adiciona n dias a uma data YYYY-MM-DD, devolve YYYY-MM-DD
+    function addDays(dateStr, n) {
+      const d = new Date(dateStr + 'T12:00:00');
+      d.setDate(d.getDate() + n);
+      return d.toISOString().slice(0, 10);
     }
 
     function fmtEur(val) {
@@ -816,34 +829,22 @@
     // ── Season end modal ───────────────────────────────────────
     const seasonOverlay = document.getElementById('seasonOverlay');
 
-    document.getElementById('btnSeasonEnd').addEventListener('click', () => {
+    function renderSeasonPreview() {
       const entries = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
-      const cfg     = loadCfg();
       const budget  = getBudget();
       const start   = getStartDate();
+      const end     = document.getElementById('seasonEndDate').value || todayStr();
 
-      if (entries.length === 0) {
-        alert('Não há abastecimentos registados nesta temporada.');
-        return;
-      }
-
-      const lastDate    = entries[entries.length - 1].data;
-      const weeks       = weekCount(start, todayStr());
-      const orcamento   = weeks * budget;
-      const colocado    = entries.reduce((s, e) => s + Number(e.colocado), 0);
-      const saldo       = orcamento - colocado;
-      const saldoCls    = saldo >= 0 ? 'pos' : 'neg';
-
-      // Pre-fill season name from start/end years
-      const startYear = start.slice(0, 4);
-      const endYear   = todayStr().slice(0, 4);
-      document.getElementById('seasonName').value =
-        startYear === endYear ? startYear : startYear + ' – ' + endYear;
+      const weeks     = weekCount(start, end);
+      const orcamento = weeks * budget;
+      const colocado  = entries.reduce((s, e) => s + Number(e.colocado), 0);
+      const saldo     = orcamento - colocado;
+      const saldoCls  = saldo >= 0 ? 'pos' : 'neg';
 
       document.getElementById('seasonSummaryPreview').innerHTML = `
         <div class="season-summary-row">
           <span>Período</span>
-          <span>${fmtDate(start)} → ${fmtDate(todayStr())}</span>
+          <span>${fmtDate(start)} → ${fmtDate(end)}</span>
         </div>
         <div class="season-summary-row">
           <span>Semanas</span>
@@ -865,9 +866,30 @@
           <span>Abastecimentos</span>
           <span>${entries.length}</span>
         </div>`;
+    }
 
+    document.getElementById('btnSeasonEnd').addEventListener('click', () => {
+      const entries = loadEntries();
+      const start   = getStartDate();
+
+      if (entries.length === 0) {
+        alert('Não há abastecimentos registados nesta temporada.');
+        return;
+      }
+
+      document.getElementById('seasonEndDate').value = todayStr();
+
+      // Pre-fill season name from start/end years
+      const startYear = start.slice(0, 4);
+      const endYear   = todayStr().slice(0, 4);
+      document.getElementById('seasonName').value =
+        startYear === endYear ? startYear : startYear + ' – ' + endYear;
+
+      renderSeasonPreview();
       seasonOverlay.classList.add('open');
     });
+
+    document.getElementById('seasonEndDate').addEventListener('change', renderSeasonPreview);
 
     function closeSeasonModal() { seasonOverlay.classList.remove('open'); }
 
@@ -879,16 +901,18 @@
       const entries = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
       const budget  = getBudget();
       const start   = getStartDate();
-      const weeks   = weekCount(start, todayStr());
+      const end     = document.getElementById('seasonEndDate').value || todayStr();
+      const weeks   = weekCount(start, end);
+      const colocado = entries.reduce((s, e) => s + Number(e.colocado), 0);
 
       const summary = {
         nome,
         inicio:    fmtDate(start),
-        fim:       fmtDate(todayStr()),
+        fim:       fmtDate(end),
         semanas:   weeks,
         orcamento: weeks * budget,
-        colocado:  entries.reduce((s, e) => s + Number(e.colocado), 0),
-        saldo:     weeks * budget - entries.reduce((s, e) => s + Number(e.colocado), 0),
+        colocado:  colocado,
+        saldo:     weeks * budget - colocado,
         registos:  entries.length,
       };
 
@@ -896,9 +920,9 @@
       seasons.push(summary);
       saveSeasons(seasons);
 
-      // Reset current season
+      // Reset current season — a nova começa no dia seguinte ao encerramento
       saveEntries([]);
-      saveCfg({ budget });
+      saveCfg({ budget, startDate: addDays(end, 1) });
       loadSettingsUI();
       closeSeasonModal();
       render();
@@ -1071,7 +1095,7 @@
     });
 
     document.getElementById('btnExport').addEventListener('click', () => {
-      const payload = { entries: loadEntries(), cfg: loadCfg() };
+      const payload = { entries: loadEntries(), cfg: loadCfg(), seasons: loadSeasons() };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -1089,12 +1113,14 @@
         reader.onload = e2 => {
           try {
             const payload = JSON.parse(e2.target.result);
-            // Support both {entries, cfg} and plain array
+            // Support both {entries, cfg, seasons} and plain array
             const entries = Array.isArray(payload) ? payload : (payload.entries || []);
             const cfg     = Array.isArray(payload) ? {}       : (payload.cfg     || {});
+            const seasons = Array.isArray(payload) ? loadSeasons() : (payload.seasons || []);
             if (!Array.isArray(entries)) throw new Error('formato inválido');
             saveEntries(entries);
             saveCfg(cfg);
+            saveSeasons(seasons);
             loadSettingsUI();
             render();
             alert('Importado com sucesso! ' + entries.length + ' registos.');
