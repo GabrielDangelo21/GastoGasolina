@@ -529,23 +529,23 @@
       </div>
       <div class="field">
         <label>Preço do kW/h (€)</label>
-        <input type="number" id="modalPrecoKwh" step="0.01" min="0" placeholder="0.00">
+        <input type="text" inputmode="numeric" id="modalPrecoKwh" placeholder="0,00">
       </div>
       <div class="field">
         <label>kW/h carregados</label>
-        <input type="number" id="modalKwh" step="0.01" min="0" placeholder="0.00">
+        <input type="text" inputmode="numeric" id="modalKwh" placeholder="0,00">
       </div>
       <div class="field">
         <label>Taxa de início (€)</label>
-        <input type="number" id="modalTaxaInicio" step="0.01" min="0" placeholder="0.00">
+        <input type="text" inputmode="numeric" id="modalTaxaInicio" placeholder="0,00">
       </div>
       <div class="field">
         <label>Preço de estacionamento (€/h)</label>
-        <input type="number" id="modalPrecoEstacionamento" step="0.01" min="0" placeholder="0.00">
+        <input type="text" inputmode="numeric" id="modalPrecoEstacionamento" placeholder="0,00">
       </div>
       <div class="field">
         <label>Tempo estacionado (h)</label>
-        <input type="number" id="modalTempoEstacionamento" step="0.25" min="0" placeholder="0.00">
+        <input type="text" inputmode="numeric" id="modalTempoEstacionamento" placeholder="0,00">
       </div>
       <div class="field">
         <label>Total</label>
@@ -908,12 +908,29 @@
     const overlay = document.getElementById('modalOverlay');
     const modalFieldIds = ['modalPrecoKwh', 'modalKwh', 'modalTaxaInicio', 'modalPrecoEstacionamento', 'modalTempoEstacionamento'];
 
+    // Máscara tipo "valor em centavos": dígitos entram pela direita
+    // e a vírgula decimal é sempre colocada antes dos 2 últimos dígitos.
+    function centsToStr(digits) {
+      const cents = parseInt(digits || '0', 10);
+      return (cents / 100).toFixed(2).replace('.', ',');
+    }
+
+    function applyCentsMask(el) {
+      const digits = el.value.replace(/\D/g, '');
+      el.value = centsToStr(digits);
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+
+    function fieldValue(id) {
+      return parseFloat(document.getElementById(id).value.replace(',', '.')) || 0;
+    }
+
     function calcTotal() {
-      const precoKwh              = parseFloat(document.getElementById('modalPrecoKwh').value) || 0;
-      const kwh                   = parseFloat(document.getElementById('modalKwh').value) || 0;
-      const taxaInicio            = parseFloat(document.getElementById('modalTaxaInicio').value) || 0;
-      const precoEstacionamento   = parseFloat(document.getElementById('modalPrecoEstacionamento').value) || 0;
-      const tempoEstacionamento   = parseFloat(document.getElementById('modalTempoEstacionamento').value) || 0;
+      const precoKwh              = fieldValue('modalPrecoKwh');
+      const kwh                   = fieldValue('modalKwh');
+      const taxaInicio            = fieldValue('modalTaxaInicio');
+      const precoEstacionamento   = fieldValue('modalPrecoEstacionamento');
+      const tempoEstacionamento   = fieldValue('modalTempoEstacionamento');
       return Number((precoKwh * kwh + taxaInicio + precoEstacionamento * tempoEstacionamento).toFixed(2));
     }
 
@@ -923,7 +940,7 @@
 
     document.getElementById('btnAdd').addEventListener('click', () => {
       document.getElementById('modalDate').value = todayStr();
-      modalFieldIds.forEach(id => { document.getElementById(id).value = '0'; });
+      modalFieldIds.forEach(id => { document.getElementById(id).value = centsToStr(''); });
       updateTotalPreview();
       overlay.classList.add('open');
       setTimeout(() => document.getElementById('modalPrecoKwh').focus(), 250);
@@ -944,21 +961,21 @@
       entries.push({
         data: date,
         colocado: total,
-        precoKwh: parseFloat(document.getElementById('modalPrecoKwh').value) || 0,
-        kwh: parseFloat(document.getElementById('modalKwh').value) || 0,
-        taxaInicio: parseFloat(document.getElementById('modalTaxaInicio').value) || 0,
-        precoEstacionamento: parseFloat(document.getElementById('modalPrecoEstacionamento').value) || 0,
-        tempoEstacionamento: parseFloat(document.getElementById('modalTempoEstacionamento').value) || 0,
+        precoKwh: fieldValue('modalPrecoKwh'),
+        kwh: fieldValue('modalKwh'),
+        taxaInicio: fieldValue('modalTaxaInicio'),
+        precoEstacionamento: fieldValue('modalPrecoEstacionamento'),
+        tempoEstacionamento: fieldValue('modalTempoEstacionamento'),
       });
       saveEntries(entries);
       closeModal();
       render();
     });
 
-    // Recalcula o total e permite Enter para guardar
+    // Aplica a máscara, recalcula o total e permite Enter para guardar
     modalFieldIds.forEach(id => {
       const el = document.getElementById(id);
-      el.addEventListener('input', updateTotalPreview);
+      el.addEventListener('input', () => { applyCentsMask(el); updateTotalPreview(); });
       el.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btnSave').click(); });
     });
 
