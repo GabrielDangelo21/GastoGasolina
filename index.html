@@ -245,6 +245,22 @@
       font-weight: 700;
       opacity: 1;
     }
+    .field select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--text);
+      background: rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+    .field select:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: rgba(6,214,199,0.05);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
     .settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn-sm {
       padding: 8px 14px;
@@ -528,6 +544,13 @@
       <div class="modal-handle"></div>
       <h2>Novo abastecimento</h2>
       <div class="field">
+        <label>Carro</label>
+        <select id="modalCarro">
+          <option value="kia">Kia EV3 (81,4 kWh)</option>
+          <option value="volvo">Volvo EX30 (65 kWh)</option>
+        </select>
+      </div>
+      <div class="field">
         <label>Data</label>
         <input type="date" id="modalDate">
       </div>
@@ -536,8 +559,14 @@
         <input type="text" inputmode="numeric" id="modalPrecoKwh" placeholder="0,00">
       </div>
       <div class="field">
-        <label>kW/h carregados</label>
-        <input type="text" inputmode="numeric" id="modalKwh" placeholder="0,00">
+        <label>Quantidade carregada</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" inputmode="numeric" id="modalKwh" placeholder="0,00" style="flex: 1;">
+          <select id="modalKwhUnidade" style="flex: 0 0 80px;">
+            <option value="kwh">kWh</option>
+            <option value="percent">%</option>
+          </select>
+        </div>
       </div>
       <div class="field">
         <label>Taxa de início (€)</label>
@@ -549,7 +578,7 @@
       </div>
       <div class="field">
         <label>Tempo estacionado (h)</label>
-        <input type="text" inputmode="numeric" id="modalTempoEstacionamento" placeholder="0,00">
+        <input type="text" inputmode="numeric" id="modalTempoEstacionamento" placeholder="0:00">
       </div>
       <div class="field">
         <label>Total</label>
@@ -566,6 +595,11 @@
     const ENTRIES_KEY = 'gastoGasolina_entries';
     const CFG_KEY     = 'gastoGasolina_cfg';
     const SEASONS_KEY = 'gastoGasolina_seasons';
+
+    const CARROS = {
+      kia: { nome: 'Kia EV3', bateria: 81.4 },
+      volvo: { nome: 'Volvo EX30', bateria: 65 }
+    };
 
     function loadSeasons() {
       try { return JSON.parse(localStorage.getItem(SEASONS_KEY) || '[]'); }
@@ -930,7 +964,7 @@
 
     // ── Modal ──────────────────────────────────────────────────
     const overlay = document.getElementById('modalOverlay');
-    const modalFieldIds = ['modalPrecoKwh', 'modalKwh', 'modalTaxaInicio', 'modalPrecoEstacionamento', 'modalTempoEstacionamento'];
+    const modalFieldIds = ['modalPrecoKwh', 'modalKwh', 'modalTaxaInicio', 'modalPrecoEstacionamento'];
 
     // Máscara tipo "valor em centavos": dígitos entram pela direita
     // e a vírgula decimal é sempre colocada antes dos 2 últimos dígitos.
@@ -945,16 +979,48 @@
       el.setSelectionRange(el.value.length, el.value.length);
     }
 
+    function applyTimeMask(el) {
+      const digits = el.value.replace(/\D/g, '');
+      if (digits.length === 0) {
+        el.value = '';
+      } else if (digits.length <= 2) {
+        el.value = digits;
+      } else {
+        const hours = digits.slice(0, -2);
+        const mins = digits.slice(-2);
+        el.value = hours + ':' + mins;
+      }
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+
+    function timeToHours(timeStr) {
+      if (!timeStr) return 0;
+      const [hours, mins] = timeStr.split(':').map(x => parseInt(x, 10) || 0);
+      return hours + (mins / 60);
+    }
+
     function fieldValue(id) {
       return parseFloat(document.getElementById(id).value.replace(',', '.')) || 0;
     }
 
+    function getKwhCarregados() {
+      const valor = fieldValue('modalKwh');
+      const unidade = document.getElementById('modalKwhUnidade').value;
+      const carro = document.getElementById('modalCarro').value;
+
+      if (unidade === 'percent') {
+        const bateria = CARROS[carro].bateria;
+        return (valor / 100) * bateria;
+      }
+      return valor;
+    }
+
     function calcTotal() {
       const precoKwh              = fieldValue('modalPrecoKwh');
-      const kwh                   = fieldValue('modalKwh');
+      const kwh                   = getKwhCarregados();
       const taxaInicio            = fieldValue('modalTaxaInicio');
       const precoEstacionamento   = fieldValue('modalPrecoEstacionamento');
-      const tempoEstacionamento   = fieldValue('modalTempoEstacionamento');
+      const tempoEstacionamento   = timeToHours(document.getElementById('modalTempoEstacionamento').value);
       return Number((precoKwh * kwh + taxaInicio + precoEstacionamento * tempoEstacionamento).toFixed(2));
     }
 
@@ -964,7 +1030,11 @@
 
     document.getElementById('btnAdd').addEventListener('click', () => {
       document.getElementById('modalDate').value = todayStr();
+      document.getElementById('modalCarro').value = 'kia';
+      document.getElementById('modalKwhUnidade').value = 'kwh';
       modalFieldIds.forEach(id => { document.getElementById(id).value = centsToStr(''); });
+      document.getElementById('modalKwh').value = centsToStr('');
+      document.getElementById('modalTempoEstacionamento').value = '0:00';
       updateTotalPreview();
       overlay.classList.add('open');
       setTimeout(() => document.getElementById('modalPrecoKwh').focus(), 250);
@@ -985,8 +1055,11 @@
       entries.push({
         data: date,
         colocado: total,
+        carro: document.getElementById('modalCarro').value,
         precoKwh: fieldValue('modalPrecoKwh'),
         kwh: fieldValue('modalKwh'),
+        kwhUnidade: document.getElementById('modalKwhUnidade').value,
+        kwhCarregados: getKwhCarregados(),
         taxaInicio: fieldValue('modalTaxaInicio'),
         precoEstacionamento: fieldValue('modalPrecoEstacionamento'),
         tempoEstacionamento: fieldValue('modalTempoEstacionamento'),
@@ -1002,6 +1075,14 @@
       el.addEventListener('input', () => { applyCentsMask(el); updateTotalPreview(); });
       el.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btnSave').click(); });
     });
+
+    const tempoEl = document.getElementById('modalTempoEstacionamento');
+    tempoEl.addEventListener('input', () => { applyTimeMask(tempoEl); updateTotalPreview(); });
+    tempoEl.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btnSave').click(); });
+
+    // Event listeners para carro e unidade
+    document.getElementById('modalCarro').addEventListener('change', updateTotalPreview);
+    document.getElementById('modalKwhUnidade').addEventListener('change', updateTotalPreview);
 
     // ── Seasons toggle ─────────────────────────────────────────
     document.getElementById('seasonsToggle').addEventListener('click', () => {
