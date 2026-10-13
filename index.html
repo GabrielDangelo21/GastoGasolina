@@ -584,9 +584,14 @@
         <label>Total</label>
         <input type="text" id="modalTotalPreview" disabled>
       </div>
-      <div class="modal-actions">
+      <div class="modal-actions" id="modalActionsNormal">
         <button class="btn-cancel" id="btnCancel">Cancelar</button>
         <button class="btn-save" id="btnSave">Guardar</button>
+      </div>
+      <div class="modal-actions" id="modalActionsEdit" style="display: none;">
+        <button class="btn-cancel" id="btnCancelEdit">Cancelar</button>
+        <button class="btn-cancel" id="btnDelete" style="background: rgba(248,81,73,0.15); color: #f85149; border: 1px solid rgba(248,81,73,0.3); flex: 1;">Apagar</button>
+        <button class="btn-save" id="btnUpdate">Guardar alterações</button>
       </div>
     </div>
   </div>
@@ -789,28 +794,24 @@
       // Exibe da mais recente para a mais antiga
       rows.slice().reverse().forEach(({ e, i, saldo }) => {
         const cls = saldo >= 0 ? 'pos' : 'neg';
-        html += '<tr>' +
+        html += '<tr data-idx="' + i + '" style="cursor: pointer;">' +
           '<td><strong>' + fmtDate(e.data) + '</strong></td>' +
           '<td class="week-cell">' + weekLabel(e.data) + '</td>' +
           '<td class="amount-cell">€' + Number(e.colocado).toFixed(2) + '</td>' +
           '<td class="saldo-cell ' + cls + '">' + fmtEur(saldo) + '</td>' +
-          '<td class="action-cell">' +
-            '<button class="btn-delete" data-idx="' + i + '" title="Apagar">✕</button>' +
-          '</td>' +
+          '<td class="action-cell">✎</td>' +
           '</tr>';
       });
 
       html += '</tbody></table>';
       tableContent.innerHTML = html;
 
-      // Delete buttons
-      tableContent.querySelectorAll('.btn-delete').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const idx = Number(btn.dataset.idx);
+      // Row click handlers for editing
+      tableContent.querySelectorAll('tr[data-idx]').forEach(tr => {
+        tr.addEventListener('click', () => {
+          const idx = Number(tr.dataset.idx);
           const all = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
-          all.splice(idx, 1);
-          saveEntries(all);
-          render();
+          openEditModal(all[idx], idx);
         });
       });
 
@@ -965,6 +966,7 @@
     // ── Modal ──────────────────────────────────────────────────
     const overlay = document.getElementById('modalOverlay');
     const modalFieldIds = ['modalPrecoKwh', 'modalKwh', 'modalTaxaInicio', 'modalPrecoEstacionamento'];
+    let editingIndex = null;
 
     // Máscara tipo "valor em centavos": dígitos entram pela direita
     // e a vírgula decimal é sempre colocada antes dos 2 últimos dígitos.
@@ -999,6 +1001,13 @@
       return hours + (mins / 60);
     }
 
+    function hoursToTime(hours) {
+      if (!hours) return '';
+      const h = Math.floor(hours);
+      const m = Math.round((hours - h) * 60);
+      return h + ':' + String(m).padStart(2, '0');
+    }
+
     function fieldValue(id) {
       return parseFloat(document.getElementById(id).value.replace(',', '.')) || 0;
     }
@@ -1028,21 +1037,45 @@
       document.getElementById('modalTotalPreview').value = '€' + calcTotal().toFixed(2);
     }
 
-    document.getElementById('btnAdd').addEventListener('click', () => {
+    function openNewModal() {
+      editingIndex = null;
+      document.querySelector('.modal h2').textContent = 'Novo abastecimento';
       document.getElementById('modalDate').value = todayStr();
       document.getElementById('modalCarro').value = 'kia';
       document.getElementById('modalKwhUnidade').value = 'kwh';
       modalFieldIds.forEach(id => { document.getElementById(id).value = centsToStr(''); });
       document.getElementById('modalKwh').value = centsToStr('');
-      document.getElementById('modalTempoEstacionamento').value = '0:00';
+      document.getElementById('modalTempoEstacionamento').value = '';
       updateTotalPreview();
+      document.getElementById('modalActionsNormal').style.display = 'flex';
+      document.getElementById('modalActionsEdit').style.display = 'none';
       overlay.classList.add('open');
       setTimeout(() => document.getElementById('modalPrecoKwh').focus(), 250);
-    });
+    }
+
+    function openEditModal(entry, idx) {
+      editingIndex = idx;
+      document.querySelector('.modal h2').textContent = 'Editar abastecimento';
+      document.getElementById('modalDate').value = entry.data;
+      document.getElementById('modalCarro').value = entry.carro || 'kia';
+      document.getElementById('modalKwhUnidade').value = entry.kwhUnidade || 'kwh';
+      document.getElementById('modalPrecoKwh').value = centsToStr(String(Math.round(entry.precoKwh * 100)));
+      document.getElementById('modalKwh').value = centsToStr(String(Math.round(entry.kwh * 100)));
+      document.getElementById('modalTaxaInicio').value = centsToStr(String(Math.round(entry.taxaInicio * 100)));
+      document.getElementById('modalPrecoEstacionamento').value = centsToStr(String(Math.round(entry.precoEstacionamento * 100)));
+      document.getElementById('modalTempoEstacionamento').value = hoursToTime(entry.tempoEstacionamento);
+      updateTotalPreview();
+      document.getElementById('modalActionsNormal').style.display = 'none';
+      document.getElementById('modalActionsEdit').style.display = 'flex';
+      overlay.classList.add('open');
+    }
+
+    document.getElementById('btnAdd').addEventListener('click', openNewModal);
 
     function closeModal() { overlay.classList.remove('open'); }
 
     document.getElementById('btnCancel').addEventListener('click', closeModal);
+    document.getElementById('btnCancelEdit').addEventListener('click', closeModal);
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
     document.getElementById('btnSave').addEventListener('click', () => {
@@ -1065,6 +1098,39 @@
         tempoEstacionamento: fieldValue('modalTempoEstacionamento'),
       });
       saveEntries(entries);
+      closeModal();
+      render();
+    });
+
+    document.getElementById('btnUpdate').addEventListener('click', () => {
+      const date  = document.getElementById('modalDate').value;
+      const total = calcTotal();
+      if (!date)      { alert('Por favor escolha a data.'); return; }
+      if (total <= 0) { alert('Por favor insira pelo menos um valor.'); return; }
+
+      const all = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
+      all[editingIndex] = {
+        data: date,
+        colocado: total,
+        carro: document.getElementById('modalCarro').value,
+        precoKwh: fieldValue('modalPrecoKwh'),
+        kwh: fieldValue('modalKwh'),
+        kwhUnidade: document.getElementById('modalKwhUnidade').value,
+        kwhCarregados: getKwhCarregados(),
+        taxaInicio: fieldValue('modalTaxaInicio'),
+        precoEstacionamento: fieldValue('modalPrecoEstacionamento'),
+        tempoEstacionamento: fieldValue('modalTempoEstacionamento'),
+      };
+      saveEntries(all);
+      closeModal();
+      render();
+    });
+
+    document.getElementById('btnDelete').addEventListener('click', () => {
+      if (!confirm('Tem a certeza que quer apagar este carregamento?')) return;
+      const all = loadEntries().sort((a, b) => a.data.localeCompare(b.data));
+      all.splice(editingIndex, 1);
+      saveEntries(all);
       closeModal();
       render();
     });
